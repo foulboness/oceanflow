@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OCEANFLOW — Interactive 3D Ocean Current & Thermohaline Simulator</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js & OrbitControls via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono for Laboratory Aesthetic -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="script.js"></script>
+  </head>
+<body class="relative w-screen h-screen overflow-hidden bg-[#040b14]">
+
+  <!-- 3D WebGL Canvas Container -->
+  <div id="canvas-container" class="absolute inset-0 w-full h-full z-0"></div>
+
+  <!-- Subtle Scientific Grid Overlay -->
+  <div class="lab-grid-overlay absolute inset-0 z-10"></div>
+
+  <!-- Projected 3D Marker Layer -->
+  <div id="markers-layer" class="absolute inset-0 pointer-events-none z-10 overflow-hidden"></div>
+
+  <!-- TOP HEADER BAR -->
+  <header class="absolute top-3 left-3 right-3 z-30 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+    <!-- Brand & Laboratory Title -->
+    <div class="hud-panel rounded-xl px-3.5 py-2 flex items-center gap-3 pointer-events-auto">
+      <div class="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center relative">
+        <svg class="w-5 h-5 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3.6 9h16.8M3.6 15h16.8" stroke-opacity="0.5" />
+          <path d="M8 12c1.5-2.5 3.5-2.5 5 0s3.5 2.5 5 0" stroke="#0de8b5" stroke-width="2" />
+        </svg>
+        <span class="status-dot absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#0de8b5]"></span>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-sm sm:text-base font-bold tracking-wider text-white">OCEANFLOW</h1>
+          <span class="hidden md:inline-block text-[10px] font-mono-tech px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+            GLOBAL CIRCULATION LAB v3.4
+          </span>
+        </div>
+        <p class="text-[11px] text-slate-400 hidden sm:block">3D Surface Gyre & Thermohaline Conveyor Simulator</p>
+      </div>
+    </div>
+
+    <!-- Camera Region Presets -->
+    <div class="hud-panel rounded-xl p-1.5 flex items-center gap-1 pointer-events-auto overflow-x-auto max-w-full">
+      <span class="text-[10px] font-mono-tech uppercase text-slate-400 px-2 hidden lg:inline">Region:</span>
+      <button onclick="setCameraPreset('global')" data-cam="global" class="cam-btn active px-2.5 py-1.5 rounded-lg text-xs font-medium bg-cyan-500/25 text-cyan-200 border border-cyan-400/40 transition">
+        Global
+      </button>
+      <button onclick="setCameraPreset('natlantic')" data-cam="natlantic" class="cam-btn px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/5 border border-transparent transition">
+        N. Atlantic / AMOC
+      </button>
+      <button onclick="setCameraPreset('npacific')" data-cam="npacific" class="cam-btn px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/5 border border-transparent transition">
+        Kuroshio / Pacific
+      </button>
+      <button onclick="setCameraPreset('southern')" data-cam="southern" class="cam-btn px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:bg-white/5 border border-transparent transition">
+        Southern / ACC
+      </button>
+    </div>
+
+    <!-- Mode Epistemic Status Badge + Mobile Panel Toggles -->
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <div id="epistemic-badge" class="hud-panel rounded-xl px-3 py-2 flex items-center gap-2">
+        <span id="epistemic-dot" class="w-2 h-2 rounded-full bg-[#0de8b5]"></span>
+        <span id="epistemic-text" class="text-[10px] sm:text-xs font-mono-tech font-semibold tracking-wide text-[#0de8b5]">
+          OBSERVATIONAL BASELINE
+        </span>
+      </div>
+
+      <!-- Mobile Toggle Buttons -->
+      <button id="toggle-left-btn" onclick="toggleDrawer('left')" class="lg:hidden hud-panel rounded-xl p-2.5 text-cyan-300 hover:bg-cyan-500/20" title="Simulation Controls">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+      </button>
+      <button id="toggle-right-btn" onclick="toggleDrawer('right')" class="lg:hidden hud-panel rounded-xl p-2.5 text-cyan-300 hover:bg-cyan-500/20" title="Telemetry & Science">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- LEFT CONTROL DECK: Layers, Environmental Physics & Climate Experiments -->
+  <aside id="left-panel" class="panel-transition fixed lg:absolute top-16 bottom-16 left-3 w-[320px] max-w-[88vw] z-20 hud-panel rounded-2xl flex flex-col overflow-hidden -translate-x-[115%] lg:translate-x-0">
+    <div class="px-4 py-3 border-b border-cyan-500/20 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+        <h2 class="text-xs font-mono-tech font-bold uppercase tracking-wider text-cyan-200">Simulation Controls</h2>
+      </div>
+      <button onclick="toggleDrawer('left')" class="lg:hidden text-slate-400 hover:text-white text-xs px-2 py-1">✕</button>
+    </div>
+
+    <div class="p-4 overflow-y-auto hud-scroll space-y-5 flex-1">
+
+      <!-- 1. Circulation Layer Selector -->
+      <div>
+        <label class="block text-[11px] font-mono-tech uppercase tracking-wider text-slate-400 mb-2">
+          Circulation Depth Layer
+        </label>
+        <div class="grid grid-cols-3 gap-1.5 bg-[#040b14]/70 p-1 rounded-xl border border-cyan-500/15">
+          <button onclick="setLayerMode('surface')" data-layer="surface" class="layer-btn active py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-cyan-500/25 text-cyan-200 border border-cyan-400/40 transition">
+            Surface
+          </button>
+          <button onclick="setLayerMode('deep')" data-layer="deep" class="layer-btn py-1.5 px-2 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 transition">
+            Deep Abyss
+          </button>
+          <button onclick="setLayerMode('conveyor')" data-layer="conveyor" class="layer-btn py-1.5 px-2 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 transition">
+            Conveyor
+          </button>
+        </div>
+        <p id="layer-hint" class="text-[11px] text-slate-400 mt-1.5 leading-snug">
+          Wind-driven upper ocean gyres (0–400m) transporting equatorial heat poleward.
+        </p>
+      </div>
+
+      <!-- 2. Particle Color Encoding -->
+      <div>
+        <label class="block text-[11px] font-mono-tech uppercase tracking-wider text-slate-400 mb-2">
+          Tracer Color Encoding
+        </label>
+        <div class="grid grid-cols-3 gap-1.5 bg-[#040b14]/70 p-1 rounded-xl border border-cyan-500/15">
+          <button onclick="setColorMode('thermal')" data-color="thermal" class="color-btn active py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-amber-500/20 text-amber-200 border border-amber-400/40 transition">
+            Thermal
+          </button>
+          <button onclick="setColorMode('velocity')" data-color="velocity" class="color-btn py-1.5 px-2 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 transition">
+            Velocity
+          </button>
+          <button onclick="setColorMode('salinity')" data-color="salinity" class="color-btn py-1.5 px-2 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 transition">
+            Salinity
+          </button>
+        </div>
+        <!-- Dynamic Color Legend Bar -->
+        <div class="mt-2">
+          <div id="color-legend-bar" class="h-2 w-full rounded-full" style="background: linear-gradient(90deg, #1d4ed8, #00f0ff, #0de8b5, #ffaa00, #ff4422);"></div>
+          <div id="color-legend-labels" class="flex justify-between text-[10px] font-mono-tech text-slate-400 mt-1">
+            <span>-1°C Polar</span>
+            <span>14°C Temp</span>
+            <span>30°C Tropics</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Environmental & Physical Parameters -->
+      <div class="space-y-3.5 pt-2 border-t border-cyan-500/15">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-mono-tech uppercase tracking-wider text-cyan-300">Ocean Physics Controls</span>
+          <span class="text-[10px] font-mono-tech text-slate-400">REAL-TIME</span>
+        </div>
+
+        <!-- Global SST Anomaly -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Global SST Anomaly</span>
+            <span id="val-temp" class="font-mono-tech font-semibold text-amber-300">+0.0 °C</span>
+          </div>
+          <input id="slider-temp" type="range" min="-2.0" max="5.0" step="0.1" value="0.0" class="ocean-slider" oninput="onParamChange()" />
+        </div>
+
+        <!-- Polar Salinity -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">N. Atlantic Polar Salinity</span>
+            <span id="val-salinity" class="font-mono-tech font-semibold text-cyan-300">34.9 PSU</span>
+          </div>
+          <input id="slider-salinity" type="range" min="32.0" max="36.5" step="0.1" value="34.9" class="ocean-slider" oninput="onParamChange()" />
+        </div>
+
+        <!-- Wind Stress -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Trade & Westerly Wind</span>
+            <span id="val-wind" class="font-mono-tech font-semibold text-emerald-300">100%</span>
+          </div>
+          <input id="slider-wind" type="range" min="20" max="200" step="5" value="100" class="ocean-slider" oninput="onParamChange()" />
+        </div>
+
+        <!-- Inspection Depth Slice -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-300">Sensor Inspection Depth</span>
+            <span id="val-depth" class="font-mono-tech font-semibold text-sky-300">50 m</span>
+          </div>
+          <input id="slider-depth" type="range" min="0" max="4000" step="50" value="50" class="ocean-slider" oninput="onParamChange()" />
+        </div>
+
+        <!-- Computed Seawater Density & Stratification Readout -->
+        <div class="bg-[#040b14]/80 rounded-xl p-2.5 border border-cyan-500/20 flex items-center justify-between">
+          <div>
+            <div class="text-[10px] font-mono-tech text-slate-400">POLAR DENSITY ρ(T,S)</div>
+            <div id="val-density" class="text-xs font-mono-tech font-bold text-cyan-200">1027.8 kg/m³</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] font-mono-tech text-slate-400">DEEP SINKING FLUX</div>
+            <div id="val-sinking-pct" class="text-xs font-mono-tech font-bold text-[#0de8b5]">100% (Active)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Climate & Oceanography Experiment Presets -->
+      <div class="pt-2 border-t border-cyan-500/15">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-mono-tech uppercase tracking-wider text-amber-300">Experiment Scenarios</span>
+          <span class="text-[10px] font-mono-tech text-slate-400">1-CLICK LAB</span>
+        </div>
+
+        <div class="space-y-1.5">
+          <button onclick="applyExperiment('baseline')" data-exp="baseline" class="exp-btn active w-full text-left px-3 py-2 rounded-xl bg-cyan-500/20 border border-cyan-400/45 transition flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-white">1. Modern Baseline Ocean</div>
+              <div class="text-[10px] text-cyan-200/80">Observational AMOC & Gyre Reference</div>
+            </div>
+            <span class="text-[10px] font-mono-tech px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">OBS</span>
+          </button>
+
+          <button onclick="applyExperiment('greenland')" data-exp="greenland" class="exp-btn w-full text-left px-3 py-2 rounded-xl bg-[#040b14]/60 hover:bg-white/5 border border-white/10 transition flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">2. Greenland Ice Sheet Melt</div>
+              <div class="text-[10px] text-slate-400">Freshwater Lens → AMOC Slowdown</div>
+            </div>
+            <span class="text-[10px] font-mono-tech px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">SIM</span>
+          </button>
+
+          <button onclick="applyExperiment('warming')" data-exp="warming" class="exp-btn w-full text-left px-3 py-2 rounded-xl bg-[#040b14]/60 hover:bg-white/5 border border-white/10 transition flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">3. +4.0°C Extreme Warming</div>
+              <div class="text-[10px] text-slate-400">High Stratification & Polar Amplification</div>
+            </div>
+            <span class="text-[10px] font-mono-tech px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">SIM</span>
+          </button>
+
+          <button onclick="applyExperiment('glacial')" data-exp="glacial" class="exp-btn w-full text-left px-3 py-2 rounded-xl bg-[#040b14]/60 hover:bg-white/5 border border-white/10 transition flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">4. Last Glacial Maximum</div>
+              <div class="text-[10px] text-slate-400">Brine Rejection & Expanded Sea Ice</div>
+            </div>
+            <span class="text-[10px] font-mono-tech px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">SIM</span>
+          </button>
+
+          <button onclick="applyExperiment('windsurge')" data-exp="windsurge" class="exp-btn w-full text-left px-3 py-2 rounded-xl bg-[#040b14]/60 hover:bg-white/5 border border-white/10 transition flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-slate-200">5. Westerly & Trade Wind Surge</div>
+              <div class="text-[10px] text-slate-400">180% Wind Stress → Intensified ACC</div>
+            </div>
+            <span class="text-[10px] font-mono-tech px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">SIM</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- RIGHT SCIENTIFIC TELEMETRY & EDUCATIONAL INSPECTOR -->
+  <aside id="right-panel" class="panel-transition fixed lg:absolute top-16 bottom-16 right-3 w-[340px] max-w-[90vw] z-20 hud-panel rounded-2xl flex flex-col overflow-hidden translate-x-[115%] lg:translate-x-0">
+    <div class="px-4 py-3 border-b border-cyan-500/20 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-[#0de8b5]"></span>
+        <h2 class="text-xs font-mono-tech font-bold uppercase tracking-wider text-cyan-200">Oceanographic Telemetry</h2>
+      </div>
+      <button onclick="toggleDrawer('right')" class="lg:hidden text-slate-400 hover:text-white text-xs px-2 py-1">✕</button>
+    </div>
+
+    <div class="p-4 overflow-y-auto hud-scroll space-y-4 flex-1">
+
+      <!-- Quick Current Waypoint Selector -->
+      <div>
+        <div class="text-[10px] font-mono-tech uppercase tracking-wider text-slate-400 mb-1.5">
+          Major Current Stations (Click to Inspect)
+        </div>
+        <div class="flex flex-wrap gap-1.5" id="station-chips">
+          <!-- Populated dynamically by JS -->
+        </div>
+      </div>
+
+      <!-- Active Station / Region Header -->
+      <div class="bg-[#040b14]/75 rounded-xl p-3 border border-cyan-500/25">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <span id="station-type-badge" class="inline-block text-[10px] font-mono-tech px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30 mb-1">
+              WARM WESTERN BOUNDARY
+            </span>
+            <h3 id="station-name" class="text-sm font-bold text-white">Gulf Stream System</h3>
+            <p id="station-coords" class="text-[11px] font-mono-tech text-slate-400">36.0° N, 70.0° W • North Atlantic</p>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] font-mono-tech text-slate-400">AMOC FLUX</div>
+            <div id="telemetry-amoc" class="text-base font-mono-tech font-bold text-[#0de8b5]">17.2 Sv</div>
+          </div>
+        </div>
+
+        <!-- 4-Cell Live Telemetry Grid -->
+        <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-cyan-500/15">
+          <div class="bg-slate-900/60 rounded-lg p-2 border border-white/5">
+            <div class="text-[10px] font-mono-tech text-slate-400">CURRENT VELOCITY</div>
+            <div id="telemetry-vel" class="text-sm font-mono-tech font-bold text-cyan-300">1.85 m/s</div>
+          </div>
+          <div class="bg-slate-900/60 rounded-lg p-2 border border-white/5">
+            <div class="text-[10px] font-mono-tech text-slate-400">WATER TEMP</div>
+            <div id="telemetry-temp" class="text-sm font-mono-tech font-bold text-amber-300">24.6 °C</div>
+          </div>
+          <div class="bg-slate-900/60 rounded-lg p-2 border border-white/5">
+            <div class="text-[10px] font-mono-tech text-slate-400">SALINITY</div>
+            <div id="telemetry-sal" class="text-sm font-mono-tech font-bold text-sky-300">36.2 PSU</div>
+          </div>
+          <div class="bg-slate-900/60 rounded-lg p-2 border border-white/5">
+            <div class="text-[10px] font-mono-tech text-slate-400">INSITU DENSITY</div>
+            <div id="telemetry-den" class="text-sm font-mono-tech font-bold text-emerald-300">1024.4 kg/m³</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vertical Water Column Profile (Thermocline & Pycnocline Sparkline) -->
+      <div class="bg-[#040b14]/75 rounded-xl p-3 border border-cyan-500/20">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-[11px] font-mono-tech font-semibold text-cyan-200">WATER COLUMN PROFILE (0–4000m)</span>
+          <span class="text-[10px] font-mono-tech text-slate-400">T(z) & ρ(z)</span>
+        </div>
+        <canvas id="profile-canvas" class="w-full h-32 rounded-lg bg-[#030810] border border-white/5"></canvas>
+        <div class="flex justify-between text-[10px] font-mono-tech text-slate-400 mt-1.5">
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span> Temp (°C)</span>
+          <span id="profile-depth-indicator" class="text-cyan-300">Sensor: 50 m</span>
+          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400 inline-block"></span> Density (ρ)</span>
+        </div>
+      </div>
+
+      <!-- Educational Briefing & Scientific Epistemology Card -->
+      <div class="bg-[#040b14]/75 rounded-xl p-3 border border-cyan-500/20 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-mono-tech font-bold uppercase text-cyan-300">Oceanographic Briefing</span>
+          <span id="briefing-tag" class="text-[9px] font-mono-tech px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-400/30">
+            PHYSICAL MECHANISM
+          </span>
+        </div>
+        <p id="briefing-text" class="text-xs text-slate-300 leading-relaxed">
+          The Gulf Stream is a swift, warm Atlantic western boundary current driven by wind-stress curl and intensified by Earth's rotation (Coriolis westward intensification). It transports ~30–150 Sverdrups (1 Sv = 10⁶ m³/s) of tropical heat toward Northern Europe.
+        </p>
+
+        <!-- Explicit Distinction Box: Observational vs Simplified Model -->
+        <div class="mt-2 pt-2 border-t border-white/10 text-[11px] text-slate-400 leading-snug">
+          <strong class="text-slate-200 font-mono-tech text-[10px]">MODEL NOTE:</strong>
+          <span id="epistemic-note">
+            Streamlines synthesize climatological surface geostrophic velocities and the Broecker thermohaline conveyor schematic. Parameter sliders apply simplified box-model scaling to advection speeds and overturning flux.
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- BOTTOM PLAYBACK & VISUALIZATION TOOLBAR -->
+  <footer class="absolute bottom-3 left-3 right-3 z-30 flex justify-center pointer-events-none">
+    <div class="hud-panel rounded-2xl px-3 py-2 flex flex-wrap items-center justify-center gap-2 sm:gap-3 pointer-events-auto">
+      <!-- Play / Pause -->
+      <button id="btn-play-pause" onclick="togglePlayPause()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-500/25 hover:bg-cyan-500/35 text-cyan-200 border border-cyan-400/40 text-xs font-semibold transition">
+        <span id="play-icon">❚❚</span>
+        <span id="play-label">Pause</span>
+      </button>
+
+      <!-- Speed Selector -->
+      <div class="flex items-center gap-1 bg-[#040b14]/75 p-1 rounded-xl border border-white/10">
+        <span class="text-[10px] font-mono-tech text-slate-400 px-1.5 hidden sm:inline">SPEED</span>
+        <button onclick="setSimSpeed(0.5)" data-speed="0.5" class="speed-btn px-2 py-1 rounded-lg text-[11px] font-mono-tech text-slate-400 hover:text-white">0.5x</button>
+        <button onclick="setSimSpeed(1)" data-speed="1" class="speed-btn active px-2 py-1 rounded-lg text-[11px] font-mono-tech bg-cyan-500/25 text-cyan-200 font-bold">1x</button>
+        <button onclick="setSimSpeed(2)" data-speed="2" class="speed-btn px-2 py-1 rounded-lg text-[11px] font-mono-tech text-slate-400 hover:text-white">2x</button>
+        <button onclick="setSimSpeed(4)" data-speed="4" class="speed-btn px-2 py-1 rounded-lg text-[11px] font-mono-tech text-slate-400 hover:text-white">4x</button>
+      </div>
+
+      <div class="h-5 w-[1px] bg-cyan-500/20 hidden sm:block"></div>
+
+      <!-- Overlay Toggles -->
+      <button id="btn-toggle-markers" onclick="toggleMarkers()" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-cyan-400/30 text-cyan-200 text-xs font-medium transition">
+        Markers: ON
+      </button>
+
+      <button id="btn-toggle-grid" onclick="toggleLatLonGrid()" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-cyan-400/30 text-cyan-200 text-xs font-medium transition">
+        Grid: ON
+      </button>
+
+      <button id="btn-toggle-rotate" onclick="toggleAutoRotate()" class="px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-slate-300 text-xs font-medium transition hidden md:inline-block">
+        Auto-Orbit: OFF
+      </button>
+
+      <!-- Reset Button -->
+      <button onclick="resetSimulation()" class="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/35 text-rose-200 text-xs font-semibold transition">
+        Reset
+      </button>
+    </div>
+  </footer>
+  </body>
+</html>
