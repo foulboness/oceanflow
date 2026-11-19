@@ -61,6 +61,3 @@ Discover how warm and cold ocean currents travel around the globe, how temperatu
 
 Created as an interactive science and visualization project exploring ocean circulation, marine systems, and the science of our oceans.
 
----
-
-\<p align="center">   \<b>OCEANFLOW\</b>\<br>   \<i>Understanding the currents that connect our planet.\</i>\<br>\<br>   Designed & developed by \<b>Miksha\</b> ♡ \</p>
