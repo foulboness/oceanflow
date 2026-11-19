@@ -1,4 +1,4 @@
-# 🌊 OCEANFLOW — Interactive Ocean Current Simulator
+# OCEANFLOW — Interactive Ocean Current Simulator
 
 An interactive ocean simulation that visualizes how ocean currents move across the planet. Explore global circulation patterns, investigate temperature differences, and understand how oceans influence Earth's climate.
 
@@ -6,13 +6,13 @@ An interactive ocean simulation that visualizes how ocean currents move across t
 
 ---
 
-## ୨୧ Overview
+## Overview
 
 **OCEANFLOW** is an interactive educational simulator designed to make oceanography easier to understand through visual exploration.
 
 Discover how warm and cold ocean currents travel around the globe, how temperature and salinity influence water movement, and how ocean circulation affects marine ecosystems and global climate systems.
 
-## ✦ Features
+## Features
 
 - **Interactive Globe** — Explore ocean currents across a global map.
 - **Current Visualization** — Watch ocean currents flow through animated particle streams.
@@ -22,7 +22,7 @@ Discover how warm and cold ocean currents travel around the globe, how temperatu
 - **Simulation Controls** — Adjust flow speed, temperature, and visualization settings.
 - **Educational Insights** — Learn about the science behind ocean movement.
 
-## ✦ Scientific Concepts
+## Scientific Concepts
 
 | Concept                  | Description                                                  |
 | ------------------------ | ------------------------------------------------------------ |
